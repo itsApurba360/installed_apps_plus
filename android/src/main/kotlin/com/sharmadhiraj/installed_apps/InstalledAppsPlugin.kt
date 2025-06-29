@@ -24,6 +24,7 @@ import io.flutter.plugin.common.EventChannel.EventSink
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.Executors
 import java.util.Locale.ENGLISH
 
