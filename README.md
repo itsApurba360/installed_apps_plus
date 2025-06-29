@@ -101,33 +101,43 @@ if (apkBytes != null) {
 
 #### Extract APK File
 
-Extract an app's APK to a specified destination path. This is useful for creating backups of installed apps.
+Extract an app's APK and get it as bytes with progress updates.
 
 ```dart
-bool success = await InstalledApps.extractApk(
-  String packageName,      // Package name of the app to extract
-  String destinationPath   // Full path where the APK should be saved, including filename
-);
-
 // Example usage:
-String downloadsPath = '/storage/emulated/0/Download';
-String packageName = 'com.example.app';
-String destinationPath = '$downloadsPath/$packageName.apk';
-
-bool success = await InstalledApps.extractApk(packageName, destinationPath);
-if (success) {
-  print('APK extracted successfully to $destinationPath');
-} else {
-  print('Failed to extract APK');
+try {
+  final apkBytes = await InstalledApps.extractApk(
+    'com.example.app',
+    onProgress: (progress) {
+      // Progress is a double between 0.0 and 1.0
+      print('Extraction progress: ${(progress * 100).toStringAsFixed(1)}%');
+    },
+  );
+  
+  if (apkBytes != null) {
+    // Do something with the APK bytes
+    print('APK size: ${apkBytes.length} bytes');
+    
+    // Example: Save to a file
+    // final file = File('/path/to/save/app.apk');
+    // await file.writeAsBytes(apkBytes);
+  } else {
+    print('Failed to extract APK');
+  }
+} catch (e) {
+  print('Error: $e');
 }
 ```
 
 **Note on Android Permissions:**
-- For Android 10 (API 29) and above, you'll need to request the `MANAGE_EXTERNAL_STORAGE` permission or use scoped storage.
-- The app needs the `WRITE_EXTERNAL_STORAGE` permission for Android 9 and below.
-- Ensure you have the necessary runtime permissions before calling this method.
-- The app needs the `READ_EXTERNAL_STORAGE` permission to access the APK file.
-- For Android 10 (API 29) and above, consider using `requestLegacyExternalStorage` in your app's `AndroidManifest.xml`.
+- The app needs the `READ_EXTERNAL_STORAGE` permission on Android 10 and below
+- For Android 11 and above, no special permissions are needed to access the APK of installed apps
+
+**Important Notes:**
+1. The APK extraction is done in a background thread
+2. Progress updates are sent via the `onProgress` callback (0.0 to 1.0)
+3. The complete APK is returned as a `Uint8List` when done
+4. The operation will time out after 60 seconds
 
 <hr/>
 

@@ -19,18 +19,28 @@ import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
+import io.flutter.plugin.common.EventChannel
+import io.flutter.plugin.common.EventChannel.EventSink
 import java.io.File
+import java.io.FileInputStream
+import java.io.IOException
+import java.util.concurrent.Executors
 import java.util.Locale.ENGLISH
 
-class InstalledAppsPlugin : MethodCallHandler, FlutterPlugin, ActivityAware {
+class InstalledAppsPlugin : MethodCallHandler, FlutterPlugin, ActivityAware, EventChannel.StreamHandler {
 
     private lateinit var channel: MethodChannel
     private var context: Context? = null
+    private var eventSink: EventSink? = null
+    private val executor = Executors.newSingleThreadExecutor()
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
         channel = MethodChannel(binding.binaryMessenger, "installed_apps")
         channel.setMethodCallHandler(this)
+
+        // Setup event channel for APK extraction progress
+        EventChannel(binding.binaryMessenger, "installed_apps/extract_apk_stream").setStreamHandler(this)
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -48,6 +58,14 @@ class InstalledAppsPlugin : MethodCallHandler, FlutterPlugin, ActivityAware {
     }
 
     override fun onDetachedFromActivity() {}
+
+    override fun onListen(arguments: Any?, events: EventSink?) {
+        eventSink = events
+    }
+
+    override fun onCancel(arguments: Any?) {
+        eventSink = null
+    }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         if (context == null) {
@@ -110,10 +128,10 @@ class InstalledAppsPlugin : MethodCallHandler, FlutterPlugin, ActivityAware {
                 val packageName = call.argument<String>("package_name") ?: ""
                 Thread {
                     try {
-                        val apkBytes = extractApk(packageName)
-                        result.success(apkBytes)
+                        extractApk(packageName)
+                        result.success(null) // Success will be sent via event channel
                     } catch (e: Exception) {
-                        result.error("APK_EXTRACTION_ERROR", e.message, null)
+                        result.error("EXTRACTION_ERROR", e.message, null)
                     }
                 }.start()
             }
@@ -213,25 +231,66 @@ class InstalledAppsPlugin : MethodCallHandler, FlutterPlugin, ActivityAware {
         }
     }
 
-    private fun extractApk(packageName: String): ByteArray? {
-        if (context == null) return null
-        
-        try {
-            val packageManager = context!!.packageManager
-            val appInfo = packageManager.getApplicationInfo(packageName, 0)
-            
-            // Get the APK file
-            val sourceFile = File(appInfo.publicSourceDir ?: appInfo.sourceDir)
-            if (!sourceFile.exists()) {
-                return null
+    private fun extractApk(packageName: String) {
+        if (context == null) {
+            eventSink?.error("CONTEXT_NULL", "Context is null", null)
+            return
+        }
+
+        executor.execute {
+            var inputStream: FileInputStream? = null
+            try {
+                val packageManager = context!!.packageManager
+                val appInfo = packageManager.getApplicationInfo(packageName, 0)
+                val sourceFile = File(appInfo.publicSourceDir ?: appInfo.sourceDir)
+
+                if (!sourceFile.exists()) {
+                    eventSink?.error("FILE_NOT_FOUND", "APK file not found", null)
+                    return@execute
+                }
+
+                val fileSize = sourceFile.length()
+                val buffer = ByteArray(4096)
+                var bytesRead: Int
+                var totalBytesRead = 0L
+
+                inputStream = FileInputStream(sourceFile)
+                val outputStream = ByteArrayOutputStream()
+
+                // Read file in chunks and report progress
+                while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                    outputStream.write(buffer, 0, bytesRead)
+                    totalBytesRead += bytesRead
+
+                    // Calculate and report progress (0.0 to 1.0)
+                    val progress = totalBytesRead.toDouble() / fileSize
+                    context?.mainLooper?.let { looper ->
+                        android.os.Handler(looper).post {
+                            eventSink?.success(progress)
+                        }
+                    }
+                }
+
+                // Send the complete APK data
+                val apkData = outputStream.toByteArray()
+                context?.mainLooper?.let { looper ->
+                    android.os.Handler(looper).post {
+                        eventSink?.success(apkData)
+                    }
+                }
+            } catch (e: Exception) {
+                context?.mainLooper?.let { looper ->
+                    android.os.Handler(looper).post {
+                        eventSink?.error("EXTRACTION_ERROR", "Failed to extract APK: ${e.message}", null)
+                    }
+                }
+            } finally {
+                try {
+                    inputStream?.close()
+                } catch (e: IOException) {
+                    // Ignore
+                }
             }
-            
-            // Read the file as bytes
-            return sourceFile.readBytes()
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return null
         }
     }
-
 }

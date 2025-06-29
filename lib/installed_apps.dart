@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:installed_apps/app_info.dart';
 
@@ -129,16 +131,48 @@ class InstalledApps {
   /// Extracts the APK of an app and returns it as bytes.
   ///
   /// [packageName] is the package name of the app to extract.
+  /// [onProgress] is an optional callback that provides the progress of the extraction (0.0 to 1.0).
   ///
-  /// Returns a [Future<Uint8List?>] containing the APK bytes, or null if extraction failed.
-  static Future<Uint8List?> extractApk(String packageName) async {
+  /// Returns a [Future<Uint8List>] containing the APK file data, or null if extraction failed.
+  static Future<Uint8List?> extractApk(
+    String packageName, {
+    void Function(double progress)? onProgress,
+  }) async {
     try {
-      return await _channel.invokeMethod<Uint8List>(
-        "extractApk",
-        {"package_name": packageName},
+      final completer = Completer<Uint8List>();
+      final channel = const EventChannel('installed_apps/extract_apk_stream');
+
+      // Listen to progress events
+      final subscription = channel.receiveBroadcastStream({
+        'package_name': packageName,
+      }).listen(
+        (event) {
+          if (event is double) {
+            onProgress?.call(event);
+          } else if (event is Uint8List) {
+            completer.complete(event);
+          }
+        },
+        onError: (error) {
+          print('Error extracting APK: $error');
+          completer.completeError(error);
+        },
+        cancelOnError: true,
       );
+
+      // Set a timeout for the operation
+      final result = await completer.future.timeout(
+        const Duration(seconds: 60),
+        onTimeout: () {
+          subscription.cancel();
+          throw TimeoutException('APK extraction timed out');
+        },
+      );
+      
+      return result;
     } catch (e) {
-      return null;
+      print('Error in extractApk: $e');
+      rethrow;
     }
   }
 }
