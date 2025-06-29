@@ -21,11 +21,11 @@ possible.
 
 #### Get List of Installed Apps
 
-``` dart
+```dart
 List<AppInfo> apps = await InstalledApps.getInstalledApps(
-	bool excludeSystemApps,
-	bool withIcon,
-	String packageNamePrefix
+  bool excludeSystemApps,
+  bool withIcon,
+  String packageNamePrefix
 );
 ```
 
@@ -33,13 +33,13 @@ Use `packageNamePrefix` to filter apps with package names starting with a specif
 
 #### Get App Info with Package Name
 
-``` dart
+```dart
 AppInfo app = await InstalledApps.getAppInfo(String packageName);
 ```
 
 #### AppInfo model class
 
-``` dart
+```dart
 class AppInfo {
   String name;
   Uint8List? icon;
@@ -53,33 +53,61 @@ class AppInfo {
 
 #### Start App with Package Name
 
-``` dart
+```dart
 InstalledApps.startApp(String packageName);
 ```
 
 #### Open App Settings Screen with Package Name
 
-``` dart
+```dart
 InstalledApps.openSettings(String packageName);
 ```
 
 #### Check if App is a System App
 
-``` dart
+```dart
 bool isSystemApp = await InstalledApps.isSystemApp(String packageName);
 ```
 
 #### Uninstall App
 
-``` dart
+```dart
 bool uninstallIsSuccessful = await InstalledApps.uninstallApp(String packageName);
 ```
 
 #### Check if App is Installed
 
-``` dart 
+```dart
 bool appIsInstalled = await InstalledApps.isAppInstalled(String packageName);
 ```
+
+#### Extract APK File
+
+Extract an app's APK to a specified destination path. This is useful for creating backups of installed apps.
+
+```dart
+bool success = await InstalledApps.extractApk(
+  String packageName,      // Package name of the app to extract
+  String destinationPath   // Full path where the APK should be saved, including filename
+);
+
+// Example usage:
+String downloadsPath = '/storage/emulated/0/Download';
+String packageName = 'com.example.app';
+String destinationPath = '$downloadsPath/$packageName.apk';
+
+bool success = await InstalledApps.extractApk(packageName, destinationPath);
+if (success) {
+  print('APK extracted successfully to $destinationPath');
+} else {
+  print('Failed to extract APK');
+}
+```
+
+**Note on Android Permissions:**
+- For Android 10 (API 29) and above, you'll need to request the `MANAGE_EXTERNAL_STORAGE` permission or use scoped storage.
+- The app needs the `WRITE_EXTERNAL_STORAGE` permission for Android 9 and below.
+- Ensure you have the necessary runtime permissions before calling this method.
 
 <hr/>
 

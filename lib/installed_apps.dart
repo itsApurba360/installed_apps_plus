@@ -125,4 +125,22 @@ class InstalledApps {
       {"package_name": packageName},
     );
   }
+
+  /// Extracts the APK of an app to the specified destination path.
+  ///
+  /// [packageName] is the package name of the app to extract.
+  /// [destinationPath] is the full path where the APK should be saved, including the filename.
+  ///
+  /// Returns a [Future<bool>] indicating whether the extraction was successful.
+  static Future<bool> extractApk(
+      String packageName, String destinationPath) async {
+    return await _channel.invokeMethod(
+          "extractApk",
+          {
+            "package_name": packageName,
+            "destination_path": destinationPath,
+          },
+        ) ??
+        false;
+  }
 }

@@ -19,6 +19,7 @@ import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
+import java.io.File
 import java.util.Locale.ENGLISH
 
 class InstalledAppsPlugin : MethodCallHandler, FlutterPlugin, ActivityAware {
@@ -103,6 +104,19 @@ class InstalledAppsPlugin : MethodCallHandler, FlutterPlugin, ActivityAware {
             "isAppInstalled" -> {
                 val packageName = call.argument<String>("package_name") ?: ""
                 result.success(isAppInstalled(packageName))
+            }
+
+            "extractApk" -> {
+                val packageName = call.argument<String>("package_name") ?: ""
+                val destinationPath = call.argument<String>("destination_path") ?: ""
+                Thread {
+                    try {
+                        val success = extractApk(packageName, destinationPath)
+                        result.success(success)
+                    } catch (e: Exception) {
+                        result.error("APK_EXTRACTION_ERROR", e.message, null)
+                    }
+                }.start()
             }
 
             else -> result.notImplemented()
@@ -197,6 +211,34 @@ class InstalledAppsPlugin : MethodCallHandler, FlutterPlugin, ActivityAware {
             true
         } catch (e: PackageManager.NameNotFoundException) {
             false
+        }
+    }
+
+    private fun extractApk(packageName: String, destinationPath: String): Boolean {
+        if (context == null) return false
+        
+        try {
+            val packageManager = context!!.packageManager
+            val appInfo = packageManager.getApplicationInfo(packageName, 0)
+            
+            // Get the APK file
+            val sourceFile = File(appInfo.publicSourceDir ?: appInfo.sourceDir)
+            if (!sourceFile.exists()) {
+                return false
+            }
+            
+            // Create parent directories if they don't exist
+            val destFile = File(destinationPath)
+            destFile.parentFile?.mkdirs()
+            
+            // Copy the file
+            sourceFile.copyTo(destFile, overwrite = true)
+            
+            // Verify the copy was successful
+            return destFile.exists() && destFile.length() > 0
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
         }
     }
 
