@@ -25,8 +25,11 @@ class Util {
             val packageInfo = packageManager.getPackageInfo(app.packageName, 0)
             map["version_name"] = packageInfo.versionName
             map["version_code"] = getVersionCode(packageInfo)
-            map["built_with"] = platformType?.value ?: BuiltWithUtil.getPlatform(packageInfo.applicationInfo)
-            map["installed_timestamp"] = File(packageInfo.applicationInfo.sourceDir).lastModified()
+            map["built_with"] = platformType?.value ?: BuiltWithUtil.getPlatform(app)
+            map["installed_timestamp"] = File(app.sourceDir).lastModified()
+            // Add package size in bytes
+            val packageFile = File(app.publicSourceDir ?: app.sourceDir)
+            map["package_size"] = if (packageFile.exists()) packageFile.length() else 0L
             return map
         }
 
