@@ -108,11 +108,10 @@ class InstalledAppsPlugin : MethodCallHandler, FlutterPlugin, ActivityAware {
 
             "extractApk" -> {
                 val packageName = call.argument<String>("package_name") ?: ""
-                val destinationPath = call.argument<String>("destination_path") ?: ""
                 Thread {
                     try {
-                        val success = extractApk(packageName, destinationPath)
-                        result.success(success)
+                        val apkBytes = extractApk(packageName)
+                        result.success(apkBytes)
                     } catch (e: Exception) {
                         result.error("APK_EXTRACTION_ERROR", e.message, null)
                     }
@@ -214,8 +213,8 @@ class InstalledAppsPlugin : MethodCallHandler, FlutterPlugin, ActivityAware {
         }
     }
 
-    private fun extractApk(packageName: String, destinationPath: String): Boolean {
-        if (context == null) return false
+    private fun extractApk(packageName: String): ByteArray? {
+        if (context == null) return null
         
         try {
             val packageManager = context!!.packageManager
@@ -224,21 +223,14 @@ class InstalledAppsPlugin : MethodCallHandler, FlutterPlugin, ActivityAware {
             // Get the APK file
             val sourceFile = File(appInfo.publicSourceDir ?: appInfo.sourceDir)
             if (!sourceFile.exists()) {
-                return false
+                return null
             }
             
-            // Create parent directories if they don't exist
-            val destFile = File(destinationPath)
-            destFile.parentFile?.mkdirs()
-            
-            // Copy the file
-            sourceFile.copyTo(destFile, overwrite = true)
-            
-            // Verify the copy was successful
-            return destFile.exists() && destFile.length() > 0
+            // Read the file as bytes
+            return sourceFile.readBytes()
         } catch (e: Exception) {
             e.printStackTrace()
-            return false
+            return null
         }
     }
 

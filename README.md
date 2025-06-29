@@ -81,6 +81,24 @@ bool uninstallIsSuccessful = await InstalledApps.uninstallApp(String packageName
 bool appIsInstalled = await InstalledApps.isAppInstalled(String packageName);
 ```
 
+#### Extract APK as Bytes
+
+Extracts an app's APK and returns it as bytes. This is useful for creating backups of installed apps or processing the APK file directly.
+
+```dart
+Uint8List? apkBytes = await InstalledApps.extractApk('com.example.app');
+if (apkBytes != null) {
+  // Save to a file
+  final file = File('/path/to/save/app.apk');
+  await file.writeAsBytes(apkBytes);
+  
+  // Or use the bytes directly
+  print('APK size: ${apkBytes.length} bytes');
+} else {
+  print('Failed to extract APK');
+}
+```
+
 #### Extract APK File
 
 Extract an app's APK to a specified destination path. This is useful for creating backups of installed apps.
@@ -108,6 +126,8 @@ if (success) {
 - For Android 10 (API 29) and above, you'll need to request the `MANAGE_EXTERNAL_STORAGE` permission or use scoped storage.
 - The app needs the `WRITE_EXTERNAL_STORAGE` permission for Android 9 and below.
 - Ensure you have the necessary runtime permissions before calling this method.
+- The app needs the `READ_EXTERNAL_STORAGE` permission to access the APK file.
+- For Android 10 (API 29) and above, consider using `requestLegacyExternalStorage` in your app's `AndroidManifest.xml`.
 
 <hr/>
 
